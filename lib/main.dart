@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'login_page.dart';
+import 'register_page.dart';
 
 void main() {
   runApp(const QuanLyTroApp());
@@ -18,7 +20,12 @@ class QuanLyTroApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1976D2)),
         useMaterial3: true,
       ),
-      home: const MainDashboard(),
+      home: LoginPage(),
+      routes: {
+        '/login': (context) => LoginPage(),
+        '/register': (context) => RegisterPage(),
+        '/dashboard': (context) => MainDashboard(),
+      },
     );
   }
 }
@@ -66,7 +73,7 @@ class MainDashboard extends StatelessWidget {
                   context,
                   Icons.grid_view,
                   "Báo phí",
-                  const FeeStatusScreen(),
+                  const FeeEntryScreen(),
                 ),
                 _menuItem(
                   context,
@@ -84,9 +91,14 @@ class MainDashboard extends StatelessWidget {
                   context,
                   Icons.sync,
                   "Sao lưu, phục\nhồi dữ liệu",
-                  null,
+                  const BackupRestoreScreen(),
                 ),
-                _menuItem(context, Icons.undo, "Liên hệ, góp ý", null),
+                _menuItem(
+                  context,
+                  Icons.undo,
+                  "Liên hệ, góp ý",
+                  const ContactScreen(),
+                ),
               ],
             ),
           ),
@@ -505,43 +517,687 @@ Widget _roomCard({
 }
 
 // --- MÀN HÌNH QUẢN LÝ CHI (HÌNH 1) ---
-class ExpenseScreen extends StatelessWidget {
+// --- MÀN HÌNH QUẢN LÝ CHI ---
+class ExpenseScreen extends StatefulWidget {
   const ExpenseScreen({super.key});
+
+  @override
+  State<ExpenseScreen> createState() => _ExpenseScreenState();
+}
+
+class _ExpenseScreenState extends State<ExpenseScreen> {
+  // Biến lưu trữ căn nhà được chọn
+  String selectedHouse = "Chọn căn nhà";
+  List<Map<String, dynamic>> expenses = [];
+  List<Map<String, dynamic>> categories = [];
+  Map<String, dynamic>? selectedCategory;
+
+  // Controllers cho form thêm/sửa chi
+  final TextEditingController dateController = TextEditingController();
+  final TextEditingController amountController = TextEditingController();
+  final TextEditingController reasonController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Danh mục chi tiêu mặc định
+    categories = [
+      {'icon': Icons.water_drop, 'name': 'Tiền nước', 'color': Colors.blue},
+      {'icon': Icons.bolt, 'name': 'Tiền điện', 'color': Colors.orange},
+      {'icon': Icons.wifi, 'name': 'Internet', 'color': Colors.purple},
+      {'icon': Icons.home, 'name': 'Tiền nhà', 'color': Colors.green},
+      {'icon': Icons.build, 'name': 'Sửa chữa', 'color': Colors.brown},
+      {'icon': Icons.more_horiz, 'name': 'Khác', 'color': Colors.teal},
+    ];
+
+    // Dữ liệu mẫu
+    expenses = [
+      {
+        'house': '123 Nguyễn Đình Chiểu, P5, Q3',
+        'date': '01/03/2026',
+        'amount': '500000',
+        'reason': 'Sửa chữa ống nước',
+        'category': categories[4], // Sửa chữa
+      },
+      {
+        'house': '123 Nguyễn Đình Chiểu, P5, Q3',
+        'date': '05/03/2026',
+        'amount': '1200000',
+        'reason': 'Mua thiết bị điện',
+        'category': categories[1], // Tiền điện
+      },
+      {
+        'house': '456 Lê Văn Sỹ, P13, Q3',
+        'date': '03/03/2026',
+        'amount': '300000',
+        'reason': 'Vệ sinh định kỳ',
+        'category': categories[5], // Khác
+      },
+    ];
+    dateController.text = _getCurrentDate();
+    amountController.text = '0';
+  }
+
+  // Hàm lấy ngày hiện tại theo định dạng dd/MM/yyyy
+  String _getCurrentDate() {
+    final now = DateTime.now();
+    return '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+  }
+
+  // Lọc chi phí theo căn nhà được chọn
+  List<Map<String, dynamic>> get filteredExpenses {
+    if (selectedHouse == "Chọn căn nhà" || selectedHouse == "Tất cả các nhà") {
+      return expenses; // Hiển thị tất cả
+    }
+    return expenses
+        .where((expense) => expense['house'] == selectedHouse)
+        .toList();
+  }
+
+  // Hiển thị bottom sheet để chọn danh mục chi
+  void _showCategorySelector() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) => Container(
+        padding: const EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Chọn danh mục chi',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Divider(),
+            Expanded(
+              child: GridView.builder(
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 15,
+                  childAspectRatio: 1.2,
+                ),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedCategory = category;
+                      });
+                      Navigator.pop(modalContext);
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(15),
+                          decoration: BoxDecoration(
+                            color: category['color'].withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selectedCategory == category
+                                  ? category['color']
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            category['icon'],
+                            size: 30,
+                            color: category['color'],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          category['name'],
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Hàm thêm khoản chi mới
+  void _addExpense() {
+    // Kiểm tra điều kiện trước khi thêm
+    if (selectedHouse == "Chọn căn nhà") {
+      _showMessage("Vui lòng chọn căn nhà!");
+      return;
+    }
+    if (selectedHouse == "Tất cả các nhà") {
+      _showMessage("Vui lòng chọn một căn nhà cụ thể để thêm chi!");
+      return;
+    }
+    if (selectedCategory == null) {
+      _showMessage("Vui lòng chọn danh mục chi!");
+      return;
+    }
+    if (dateController.text.isEmpty ||
+        amountController.text.isEmpty ||
+        reasonController.text.isEmpty) {
+      _showMessage("Vui lòng điền đầy đủ thông tin!");
+      return;
+    }
+
+    // Thêm khoản chi mới vào danh sách
+    setState(() {
+      expenses.insert(0, {
+        'house': selectedHouse, // Lưu thông tin căn nhà
+        'date': dateController.text,
+        'amount': amountController.text.replaceAll(
+          RegExp(r'[^0-9]'),
+          '',
+        ), // Lưu số tiền dưới dạng chuỗi chỉ chứa số
+        'reason': reasonController.text,
+        'category': selectedCategory,
+      });
+      amountController.text = '0';
+      reasonController.text = '';
+      selectedCategory = null;
+    });
+    _showMessage("Đã thêm khoản chi!");
+  }
+
+  // Hàm sửa khoản chi
+  void _editExpense(int index) {
+    final tempDateController = TextEditingController(
+      text: expenses[index]['date'],
+    );
+    final tempAmountController = TextEditingController(
+      text: expenses[index]['amount'],
+    );
+    final tempReasonController = TextEditingController(
+      text: expenses[index]['reason'],
+    );
+    Map<String, dynamic>? tempCategory = expenses[index]['category'];
+
+    // Hiển thị dialog sửa khoản chi
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Sửa khoản chi'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: tempDateController,
+                  readOnly: true, // Không cho phép gõ phím
+                  decoration: const InputDecoration(
+                    labelText: 'Ngày chi',
+                    border: OutlineInputBorder(),
+                    suffixIcon: Icon(Icons.calendar_today),
+                  ),
+                  onTap: () async {
+                    // Mở DatePicker khi nhấn vào ô
+                    final DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (pickedDate != null) {
+                      setDialogState(() {
+                        // Cập nhật giá trị vào controller để hiển thị lên màn hình
+                        tempDateController.text =
+                            '${pickedDate.day.toString().padLeft(2, '0')}/${pickedDate.month.toString().padLeft(2, '0')}/${pickedDate.year}';
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () {
+                    // Hiển thị bottom sheet để chọn danh mục chi trong dialog sửa
+                    showModalBottomSheet(
+                      context: context,
+                      builder: (innerContext) => Container(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Chọn danh mục',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: categories
+                                  .map(
+                                    (cat) => GestureDetector(
+                                      onTap: () {
+                                        setDialogState(() {
+                                          tempCategory = cat;
+                                        });
+                                        Navigator.pop(innerContext);
+                                      },
+                                      // Hiển thị danh mục chi với trạng thái được chọn
+                                      child: Column(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: cat['color'].withOpacity(
+                                                0.2,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: tempCategory == cat
+                                                    ? cat['color']
+                                                    : Colors.transparent,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              cat['icon'],
+                                              color: cat['color'],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            cat['name'],
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  // Hiển thị danh mục chi đã chọn hoặc placeholder nếu chưa chọn
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        if (tempCategory != null) ...[
+                          Icon(
+                            tempCategory!['icon'],
+                            color: tempCategory!['color'],
+                          ),
+                          const SizedBox(width: 10),
+                          Text(tempCategory!['name']),
+                        ] else
+                          const Text('Chọn danh mục'),
+                        const Spacer(),
+                        const Icon(Icons.arrow_drop_down),
+                      ],
+                    ),
+                  ),
+                ),
+                // Các trường thông tin khác
+                const SizedBox(height: 10),
+                TextField(
+                  controller: tempAmountController,
+                  decoration: const InputDecoration(
+                    labelText: 'Số tiền',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: tempReasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Lý do chi',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Nút Hủy và Lưu
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1976D2),
+              ),
+              onPressed: () {
+                if (tempCategory == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Vui lòng chọn danh mục!')),
+                  );
+                  return;
+                }
+                // Cập nhật thông tin khoản chi đã sửa
+                setState(() {
+                  expenses[index] = {
+                    'house':
+                        expenses[index]['house'], // Giữ nguyên căn nhà được chọn
+                    'date': tempDateController.text,
+                    'amount': tempAmountController.text.replaceAll(
+                      RegExp(r'[^0-9]'),
+                      '',
+                    ),
+                    'reason': tempReasonController.text,
+                    'category': tempCategory,
+                  };
+                });
+                Navigator.pop(context);
+                _showMessage("Đã cập nhật!");
+              },
+              child: const Text('Lưu', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Hàm xóa khoản chi
+  void _deleteExpense(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: const Text('Bạn có chắc muốn xóa khoản chi này?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              setState(() {
+                expenses.removeAt(index);
+              });
+              Navigator.pop(context);
+              _showMessage("Đã xóa!");
+            },
+            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hàm hiển thị thông báo
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  // Hàm định dạng số tiền
+  String _formatCurrency(String amount) {
+    try {
+      final number = int.parse(amount.replaceAll(RegExp(r'[^0-9]'), ''));
+      return '${number.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), // Thêm dấu chấm sau mỗi nhóm 3 chữ số
+        (Match m) => '${m[1]}.',
+      )} đ';
+    } catch (e) {
+      return '0 đ';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1976D2),
-        title: const Text(
-          "Quản lý chi: tiền nhà, điện, nước...",
-          style: TextStyle(color: Colors.white, fontSize: 14),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
+        title: const Text("Quản lý chi", style: TextStyle(color: Colors.white)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              "Chọn căn nhà để quản lý chi",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            // Dropdown chọn căn nhà
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  builder: (context) => Container(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          leading: const Icon(
+                            Icons.home_work,
+                            color: Color(0xFF1976D2),
+                          ),
+                          title: const Text(
+                            'Tất cả các nhà',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          trailing: selectedHouse == 'Tất cả các nhà'
+                              ? const Icon(
+                                  Icons.check,
+                                  color: Color(0xFF1976D2),
+                                )
+                              : null,
+                          onTap: () {
+                            setState(() {
+                              selectedHouse = 'Tất cả các nhà';
+                            });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        // Danh sách các căn nhà có thể chọn
+                        const Divider(),
+                        ListTile(
+                          title: const Text('123 Nguyễn Đình Chiểu, P5, Q3'),
+                          trailing:
+                              selectedHouse == '123 Nguyễn Đình Chiểu, P5, Q3'
+                              ? const Icon(
+                                  Icons.check,
+                                  color: Color(0xFF1976D2),
+                                )
+                              : null,
+                          onTap: () {
+                            setState(() {
+                              selectedHouse = '123 Nguyễn Đình Chiểu, P5, Q3';
+                            });
+                            Navigator.pop(context);
+                          },
+                        ),
+                        ListTile(
+                          title: const Text('456 Lê Văn Sỹ, P13, Q3'),
+                          trailing: selectedHouse == '456 Lê Văn Sỹ, P13, Q3'
+                              ? const Icon(
+                                  Icons.check,
+                                  color: Color(0xFF1976D2),
+                                )
+                              : null,
+                          onTap: () {
+                            setState(() {
+                              selectedHouse = '456 Lê Văn Sỹ, P13, Q3';
+                            });
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: _fakeDropdown(selectedHouse),
+            ),
+            const SizedBox(height: 20),
+
+            // Hàng 1: Ngày chi + Danh mục chi
             Row(
               children: [
-                Expanded(flex: 2, child: _fakeDropdown("Chọn căn nhà")),
+                Expanded(
+                  child: TextField(
+                    controller: dateController,
+                    decoration: InputDecoration(
+                      labelText: 'Ngày chi',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 12,
+                      ),
+                    ),
+                    readOnly: true,
+                    // Hiển thị DatePicker khi bấm vào TextField
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      // Cập nhật ngày đã chọn vào TextField
+                      if (date != null) {
+                        setState(() {
+                          dateController.text =
+                              '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+                        });
+                      }
+                    },
+                  ),
+                ),
+                // Danh mục chi tiêu
                 const SizedBox(width: 8),
-                Expanded(flex: 1, child: _fakeDropdown("Ngày chi")),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _showCategorySelector,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          if (selectedCategory != null) ...[
+                            Icon(
+                              selectedCategory!['icon'],
+                              color: selectedCategory!['color'],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                selectedCategory!['name'],
+                                style: const TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ] else
+                            const Expanded(
+                              child: Text(
+                                'Danh mục chi',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          const Icon(Icons.arrow_drop_down, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
+
+            // Hàng 2: Số tiền + Lý do + Nút Lưu
             Row(
               children: [
-                Expanded(child: _fakeDropdown("Tiền nhà")),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: amountController,
+                    decoration: InputDecoration(
+                      labelText: 'Số tiền chi',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 12,
+                      ),
+                    ),
+                    keyboardType: TextInputType.number,
+                    onTap: () {
+                      // Xóa số 0 khi bấm vào
+                      if (amountController.text == '0') {
+                        amountController.clear();
+                      }
+                    },
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: _fakeInput("Số tiền chi", "0 đ")),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(child: _fakeInput("Lý do chi", "")),
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: reasonController,
+                    decoration: InputDecoration(
+                      labelText: 'Lý do chi',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -549,21 +1205,144 @@ class ExpenseScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                   ),
-                  onPressed: () {},
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text("Lưu", style: TextStyle(color: Colors.white)),
+                  onPressed: _addExpense,
+                  child: const Text(
+                    "Lưu",
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ],
             ),
+            // Danh sách chi tiêu đã thêm
             const SizedBox(height: 20),
             const Text(
               "Danh sách phí đã chi",
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            const Expanded(child: EmptyDataWidget()),
+            const SizedBox(height: 10),
+            Expanded(
+              child: filteredExpenses.isEmpty
+                  ? const EmptyDataWidget()
+                  : ListView.builder(
+                      itemCount: filteredExpenses.length,
+                      itemBuilder: (context, index) {
+                        final expense = filteredExpenses[index];
+                        final category = expense['category'];
+                        final houseName = expense['house'] ?? 'Không rõ';
+                        // Tìm index thực trong expenses để sửa/xóa đúng
+                        final actualIndex = expenses.indexOf(expense);
+                        // Hiển thị thông tin khoản chi
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          elevation: 2,
+                          child: ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: category['color'].withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                category['icon'],
+                                color: category['color'],
+                                size: 24,
+                              ),
+                            ),
+                            title: Text(
+                              expense['reason'],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${category['name']} • ${expense['date']}',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  '🏠 $houseName',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade700,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      _formatCurrency(expense['amount']),
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 8),
+                                PopupMenuButton(
+                                  icon: const Icon(Icons.more_vert),
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.edit, size: 18),
+                                          SizedBox(width: 8),
+                                          Text('Sửa'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.delete,
+                                            size: 18,
+                                            color: Colors.red,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'Xóa',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  onSelected: (value) {
+                                    if (value == 'edit') {
+                                      _editExpense(actualIndex);
+                                    } else if (value == 'delete') {
+                                      _deleteExpense(actualIndex);
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
       ),
@@ -650,73 +1429,554 @@ class ReportScreen extends StatelessWidget {
 }
 
 // --- MÀN HÌNH THỐNG KÊ BÁO PHÍ (HÌNH 4) ---
-class FeeStatusScreen extends StatelessWidget {
-  const FeeStatusScreen({super.key});
+class FeeEntryScreen extends StatelessWidget {
+  const FeeEntryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1976D2),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
-          "Thống kê báo phí",
-          style: TextStyle(color: Colors.white),
+          "Lập hóa đơn / Báo phí",
+          style: TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
-      body: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(10),
-            child: Text(
-              "Chọn căn nhà để xem kết quả báo phí",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: _fakeDropdown("Chọn căn nhà"),
-                ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _fakeDropdown("Chọn căn nhà"),
+            const SizedBox(height: 10),
+            _fakeDropdown("Chọn phòng (Tất cả)"),
+            const SizedBox(height: 20),
+            const Text(
+              "Chỉ số Điện (Kwh)",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1976D2),
               ),
-              _fakeDropdown("3/2026", icon: Icons.calendar_month),
-              const SizedBox(width: 10),
-            ],
-          ),
-          Container(
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(border: Border.all(color: Colors.blue)),
-            child: Row(
+            ),
+            const SizedBox(height: 10),
+            Row(
               children: [
-                _statusCell("Chưa báo", true),
-                _statusCell("Đã báo", false),
-                _statusCell("Đóng một phần", false),
-                _statusCell("Đã đóng", false),
+                Expanded(child: _fakeInput("Chỉ số cũ", "1.250")),
+                const SizedBox(width: 10),
+                Expanded(child: _fakeInput("Chỉ số mới", "0")),
               ],
             ),
+            const SizedBox(height: 20),
+            const Text(
+              "Chỉ số Nước (Khối)",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1976D2),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _fakeInput("Chỉ số cũ", "450")),
+                const SizedBox(width: 10),
+                Expanded(child: _fakeInput("Chỉ số mới", "0")),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _fakeInput("Phí dịch vụ khác / Ghi chú", "Nhập nội dung..."),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {},
+                child: const Text(
+                  "TÍNH TIỀN & XUẤT HÓA ĐƠN",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 15),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FeeEntryScreen(),
+                  ),
+                ),
+                child: const Text(
+                  "Xem Thống kê báo phí / Lịch sử",
+                  style: TextStyle(
+                    color: Color(0xFF1976D2),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// MÀN HÌNH SAO LƯU & PHỤC HỒI
+// ==========================================
+class BackupRestoreScreen extends StatelessWidget {
+  const BackupRestoreScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1976D2),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Sao lưu & Phục hồi",
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "SAO LƯU DỮ LIỆU",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF1976D2),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _backupCard(
+              Icons.cloud_upload,
+              "Sao lưu lên Google Drive",
+              "An toàn, tự động đồng bộ qua email",
+              Colors.blue,
+            ),
+            _backupCard(
+              Icons.storage,
+              "Lưu vào bộ nhớ máy",
+              "Tạo file backup nội bộ trên điện thoại",
+              Colors.blueGrey,
+            ),
+            const SizedBox(height: 30),
+            const Text(
+              "PHỤC HỒI DỮ LIỆU",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.red,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _backupCard(
+              Icons.settings_backup_restore,
+              "Phục hồi từ Cloud",
+              "Lấy lại dữ liệu từ Google Drive",
+              Colors.orange,
+            ),
+            _backupCard(
+              Icons.file_present,
+              "Chọn file từ máy",
+              "Chọn file backup có sẵn trong máy",
+              Colors.green,
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info, color: Colors.grey),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Lần sao lưu cuối cùng: 08:45 - 08/03/2026",
+                      style: TextStyle(color: Colors.black54, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _backupCard(IconData icon, String title, String sub, Color color) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.1),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {},
+      ),
+    );
+  }
+}
+
+class ContactScreen extends StatefulWidget {
+  const ContactScreen({super.key});
+
+  @override
+  State<ContactScreen> createState() => _ContactScreenState();
+}
+
+class _ContactScreenState extends State<ContactScreen> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController messageController = TextEditingController();
+  String selectedType = 'Góp ý';
+
+  // Hàm xử lý khi người dùng bấm nút gửi góp ý
+  void _submitFeedback() {
+    if (nameController.text.isEmpty || messageController.text.isEmpty) {
+      _showMessage('Vui lòng điền đầy đủ họ tên và nội dung!');
+      return;
+    }
+
+    // Hiển thị dialog xác nhận
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 30),
+            SizedBox(width: 10),
+            Text('Gửi thành công!'),
+          ],
+        ),
+        content: const Text(
+          'Cảm ơn bạn đã gửi phản hồi. Chúng tôi sẽ xem xét và phản hồi trong thời gian sớm nhất!',
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1976D2),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _clearForm();
+            },
+            child: const Text('Đóng', style: TextStyle(color: Colors.white)),
           ),
-          const Expanded(child: EmptyDataWidget()),
         ],
       ),
     );
   }
 
-  static Widget _statusCell(String label, bool active) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      color: active ? const Color(0xFF1976D2) : Colors.white,
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 10,
-          color: active ? Colors.white : Colors.blue,
-          fontWeight: FontWeight.bold,
+  // Hàm xóa form sau khi gửi góp ý thành công
+  void _clearForm() {
+    nameController.clear();
+    emailController.clear();
+    phoneController.clear();
+    messageController.clear();
+    setState(() {
+      selectedType = 'Góp ý';
+    });
+  }
+
+  // Hàm hiển thị thông báo
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  // Widget hiển thị thông tin liên hệ và form góp ý
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1976D2),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Liên hệ, góp ý',
+          style: TextStyle(color: Colors.white),
         ),
       ),
-    ),
-  );
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Thông tin liên hệ
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Color(0xFF1976D2)),
+                        SizedBox(width: 10),
+                        Text(
+                          'Thông tin liên hệ',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1976D2),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    _contactRow(Icons.business, 'Công ty', 'Quản lý trọ'),
+                    const SizedBox(height: 10),
+                    _contactRow(Icons.email, 'Email', 'support@quanlytro.vn'),
+                    const SizedBox(height: 10),
+                    _contactRow(Icons.phone, 'Hotline', '1900 xxxx'),
+                    const SizedBox(height: 10),
+                    _contactRow(
+                      Icons.location_on,
+                      'Địa chỉ',
+                      'TP. Hồ Chí Minh, Việt Nam',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 25),
+
+            // Form góp ý
+            const Text(
+              'Gửi góp ý của bạn',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 15),
+
+            // Loại phản hồi
+            const Text(
+              'Loại phản hồi',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              // Dropdown chọn loại phản hồi
+              child: DropdownButton<String>(
+                value: selectedType,
+                isExpanded: true,
+                underline: const SizedBox(),
+                items: ['Góp ý', 'Báo lỗi', 'Yêu cầu tính năng', 'Khác']
+                    .map(
+                      (type) =>
+                          DropdownMenuItem(value: type, child: Text(type)),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedType = value!;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            // Họ tên
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Họ và tên *',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: const Icon(Icons.person),
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            // Email
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: const Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 15),
+
+            // Số điện thoại
+            TextField(
+              controller: phoneController,
+              decoration: InputDecoration(
+                labelText: 'Số điện thoại',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: const Icon(Icons.phone),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 15),
+
+            // Nội dung
+            TextField(
+              controller: messageController,
+              decoration: InputDecoration(
+                labelText: 'Nội dung góp ý *',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignLabelWithHint: true,
+              ),
+              maxLines: 5,
+            ),
+            const SizedBox(height: 20),
+
+            // Nút gửi
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1976D2),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: _submitFeedback,
+                child: const Text(
+                  'Gửi góp ý',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Mạng xã hội
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Theo dõi chúng tôi',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _socialButton(Icons.facebook, 'Facebook'),
+                        _socialButton(Icons.mark_email_read, 'Zalo'),
+                        _socialButton(Icons.phone_android, 'App'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget hiển thị một hàng thông tin liên hệ
+  Widget _contactRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.grey.shade700),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Widget hiển thị nút mạng xã hội
+  Widget _socialButton(IconData icon, String label) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1976D2).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: const Color(0xFF1976D2), size: 28),
+        ),
+        const SizedBox(height: 5),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
 }
 
 // --- WIDGETS DÙNG CHUNG ---
